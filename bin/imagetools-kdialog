@@ -1,0 +1,705 @@
+#!/bin/bash
+#
+#  Part of kde-servicemenus-imagetools
+#  Copyright (c) since 2021 by Marco Nelles <marco at maniatek dot de>
+#  (derived from kde-service-menu-reimage Version 2.5, Copyright (C) 2018-2019 Giuseppe Benigno <giuseppe.benigno(at)gmail.com>)
+#
+#  This program is free software: you can redistribute it and/or modify
+#  it under the terms of the GNU General Public License as published by
+#  the Free Software Foundation, either version 3 of the License, or
+#  (at your option) any later version.
+#
+#  This program is distributed in the hope that it will be useful,
+#  but WITHOUT ANY WARRANTY; without even the implied warranty of
+#  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+#  GNU General Public License for more details.
+#
+#  You should have received a copy of the GNU General Public License
+#  along with this program.  If not, see <http://www.gnu.org/licenses/>.
+#
+
+readonly PROGNAME=$(basename $0)
+
+## Language
+
+load_language_en_US () {
+
+    msg_help_text="
+Image tool collection for KDE service menus.
+
+Usage: ${PROGNAME} \$command --
+
+Commands:
+    help, -h, --help
+        Show this help text
+
+    convert <\$format|custom>
+        Convert the image to the desired format. A complete list
+        can be obtained with: \"mogrify -list format\".
+
+    resize <\$percent|\$pixel|custom>
+        Resize image file. Give scale factor in percentage or
+        the maximum size in pixel for the longer edge. Values
+        can be e.g. \"50%\" or \"1920px\".
+    rotate <\$angle|auto>
+        Rotate the image by the desired angle in degree. Postive
+        values rotate to the right, negative values to the left.
+        Values can be e.g. \"90\" or \"-90\".
+    mirror <flip|flop>
+        Mirror image. flip: mirror in the vertical axis, flop:
+        mirror in the horizintal axis.
+
+    jpeg_makeprogressive
+        Encode JPEG progressive
+    jpeg_optimize
+        Optimize JPEG encoding (lossy)
+    jpeg_weboptimize
+        Resize JPEG to 1920px on the longer side (max. FullHD),
+        optimize JPEG encoding (lossy) and
+        remove all unnecessary metadata (strip)
+    jpeg_recompress <\$percent|custom>
+        Recompress JPEG
+
+    png_optimize
+        Optimize PNG encoding (lossless)
+
+    strip
+        Remove all unnecessary metadata
+
+    gen_icon
+        generate icon (format PNG, size: 360x360px)
+    gen_icon_rectangle
+        generate icon (format PNG, size: 440x360px)
+    gen_favicon
+        generate favicon
+
+Examples:
+    ${PROGNAME} jpeg_optimize /path/to/image1.jpg /path/to/image2.jpg
+    ${PROGNAME} jpeg_recompress 50% /path/to/image1.jpg
+    ${PROGNAME} resize 1920p /path/to/image1.jpg
+    ${PROGNAME} resize custom /path/to/image1.jpg
+"
+
+    msg_common_dependency_check_failed_title="Dependency check failed"
+
+    msg_common_kdialog_not_found_text="kdialog not found. Assuming KDE environment."
+    msg_common_imagemagick_not_found_text="ImageMagick not found."
+    msg_common_exiftool_not_found_text="ExifTool not found."
+    msg_common_optipng_not_found_text="OptiPNG not found."
+
+    msg_common_abort="Operation interrupted by the user."
+    msg_common_overwrite_text="In case the images to be saved have the same name as those to be processed.\nDo you want to overwrite them?"
+    msg_common_progress_text="Processing file \$i of \$file_count \(\$basename_file)\)"
+    msg_common_finish_ok="Done."
+    msg_common_finish_error="An error has occurred."
+    msg_common_file_not_found="File \$basename_file not found."
+    msg_common_command_not_found_text="The requested command \$command is not implemented."
+
+    msg_convert_title="Convert image"
+    msg_convert_format_input_text="Type the format you want.\nA complete list can be obtained from the shell with: mogrify -list format\nor by consulting the ImageMagick manual."
+    msg_convert_finish_title="Convertion of \$basename_file"
+
+    msg_resize_title="Resizing image"
+    msg_resize_scale_input_text="Type the scale factor in percentage or the maximum size in pixel you want for the longer edge.\nValid values can be: 50% or 1920p:"
+    msg_resize_finish_title="Resizing of \$basename_file"
+
+    msg_rotate_title="Rotating image"
+    msg_rotate_angle_input_text="Enter the desired rotation angle in degree:"
+    msg_rotate_finish_title="Rotating of \$basename_file"
+
+    msg_mirror_title="Mirror image"
+    msg_mirror_finish_title="Mirroring of \$basename_file"
+
+    msg_jpeg_recompress_title="Recompress JPEG"
+    msg_jpeg_recompress_quality_input_text="Type the quality in percent:"
+    msg_jpeg_recompress_finish_title="Recompressing of \$basename_file"
+
+    msg_jpeg_optimize_title="Optimize JPEG"
+    msg_jpeg_optimize_finish_title="Optimizing of \$basename_file"
+
+    msg_jpeg_weboptimize_title="Optimize JPEG for Web"
+    msg_jpeg_weboptimize_finish_title="Optimizing of \$basename_file"
+
+    msg_jpeg_makeprogressive_title="Make JPEG progressive"
+    msg_jpeg_makeprogressive_finish_title="Make \$basename_file progressive"
+
+    msg_gen_icon_title="Generate icon"
+    msg_gen_icon_finish_title="Generate icon of \$basename_file"
+
+    msg_gen_icon_rectangle_title="Generate icon"
+    msg_gen_icon_rectangle_finish_title="Generate icon of \$basename_file"
+
+    msg_gen_favicon_title="Generate favicon"
+    msg_gen_favicon_finish_title="Generate favicon of \$basename_file"
+
+}
+
+lang=${LANGUAGE%%:*}
+type load_language_${lang} &> /dev/null || lang='en_US'
+load_language_${lang}
+
+## Check dependencies
+
+kdialog_bin=$(which kdialog)
+if [ -z "${kdialog_bin}" ]; then
+    echo "${msg_common_kdialog_not_found_text}"
+    exit 1
+fi
+
+mogrify_bin=$(which mogrify)
+if [ -z "${mogrify_bin}" ]; then
+    "${kdialog_bin}" --icon configure --title "${msg_common_dependency_check_failed_title}" --error "${msg_common_imagemagick_not_found_text}"
+    exit 2
+fi
+
+convert_bin=$(which convert)
+if [ -z "${convert_bin}" ]; then
+    "${kdialog_bin}" --icon configure --title "${msg_common_dependency_check_failed_title}" --error "${msg_common_imagemagick_not_found_text}"
+    exit 2
+fi
+
+exiftool_bin=$(which exiftool)
+if [ -z "${exiftool_bin}" ]; then
+    "${kdialog_bin}" --icon configure --title "${msg_common_dependency_check_failed_title}" --error "${msg_common_exiftool_not_found_text}"
+    exit 2
+fi
+
+optipng_bin=$(which optipng)
+if [ -z "${optipng_bin}" ]; then
+    "${optipng_bin}" --icon configure --title "${msg_common_dependency_check_failed_title}" --error "${msg_common_optipng_not_found_text}"
+    exit 2
+fi
+
+## Exec functions
+
+exec_convert () {
+
+    local inputfile="$1"
+    local format="$FORMAT"
+
+    local dir=$(dirname -- "${inputfile}")
+    local name="${inputfile##*/}"
+    local base="${name%.*}"
+    local ext="${name##*.}"
+
+    if [ "${ext}" != "${format}" ]; then
+        OUTPUT=$("${mogrify_bin}" -format "${format}" "${inputfile}" 2>&1)
+    fi
+
+    return $?
+
+}
+
+exec_resize () {
+
+    local inputfile="$1"
+    local scale_factor="$SCALE_FACTOR"
+
+    local dir=$(dirname -- "${inputfile}")
+    local name="${inputfile##*/}"
+    local base="${name%.*}"
+    local ext="${name##*.}"
+
+    if [ "${scale_factor: -1}" == "%" ]; then
+        if [ "${overwrite}" = true ]; then
+            OUTPUT=$("${mogrify_bin}" -resize "${scale_factor}" "${inputfile}" 2>&1)
+        else
+            OUTPUT=$("${convert_bin}" -resize "${scale_factor}" "${inputfile}" "${dir}/${base}_resized_${scale_factor}.${ext}" 2>&1)
+        fi
+    elif [ "${scale_factor: -2}" == "px" ]; then
+        scale_factor=${scale_factor::-2}
+        if [ "${overwrite}" = true ]; then
+            OUTPUT=$("${mogrify_bin}" -resize "${scale_factor}x${scale_factor}>" "${inputfile}" 2>&1)
+        else
+            OUTPUT=$("${convert_bin}" -resize "${scale_factor}x${scale_factor}>" "${inputfile}" "${dir}/${base}_resized_${scale_factor}p.${ext}" 2>&1)
+        fi
+    fi
+
+    return $?
+
+}
+
+exec_rotate () {
+
+    local inputfile="$1"
+    local angle="$ANGLE"
+
+    local dir=$(dirname -- "${inputfile}")
+    local name="${inputfile##*/}"
+    local base="${name%.*}"
+    local ext="${name##*.}"
+
+    if [ "${overwrite}" = true ]; then
+        if [ "${angle}" = "auto" ]; then
+            OUTPUT=$("${mogrify_bin}" -auto-orient "${inputfile}" 2>&1)
+        else
+            OUTPUT=$("${mogrify_bin}" -rotate ${angle} "${inputfile}" 2>&1)
+        fi
+    else
+        if [ "${angle}" = "auto" ]; then
+            OUTPUT=$("${convert_bin}" -auto-orient "${inputfile}" "${dir}/${base}_rotated_${angle}°.${ext}" 2>&1)
+        else
+            OUTPUT=$("${convert_bin}" -rotate ${angle} "${inputfile}" "${dir}/${base}_rotated_${angle}°.${ext}" 2>&1)
+        fi
+    fi
+
+    return $?
+
+}
+
+exec_mirror () {
+
+    local inputfile="$1"
+    local mirrordirection="$MIRRORDIRECTION"
+
+    local dir=$(dirname -- "${inputfile}")
+    local name="${inputfile##*/}"
+    local base="${name%.*}"
+    local ext="${name##*.}"
+
+    if [ "${overwrite}" = true ]; then
+        OUTPUT=$("${mogrify_bin}" -"${mirrordirection}" "${inputfile}" 2>&1)
+    else
+        OUTPUT=$("${convert_bin}" -"${mirrordirection}" "${inputfile}" "${dir}/${base}_${mirrordirection}.${ext}" 2>&1)
+    fi
+
+    return $?
+
+}
+
+exec_jpeg_recompress () {
+
+    local inputfile="$1"
+    local quality="$JPEG_QUALITY"
+
+    local dir=$(dirname -- "${inputfile}")
+    local name="${inputfile##*/}"
+    local base="${name%.*}"
+    local ext="${name##*.}"
+
+    if [ "${overwrite}" = true ]; then
+        OUTPUT=$("${mogrify_bin}" -quality "${quality}" "${inputfile}" 2>&1)
+    else
+        OUTPUT=$("${convert_bin}" -quality "${quality}" "${inputfile}" "${dir}/${base}_recompressed_${quality}.${ext}" 2>&1)
+    fi
+
+    return $?
+}
+
+exec_jpeg_optimize () {
+
+    local inputfile="$1"
+
+    local dir=$(dirname -- "${inputfile}")
+    local name="${inputfile##*/}"
+    local base="${name%.*}"
+    local ext="${name##*.}"
+
+    ## https://www.smashingmagazine.com/2015/06/efficient-image-resizing-with-imagemagick/
+    if [ "${overwrite}" = true ]; then
+        OUTPUT=$("${mogrify_bin}" -filter Triangle -define filter:support=2 -unsharp 0.25x0.25+8+0.065 -dither None -posterize 136 -quality 82 -define jpeg:fancy-upsampling=off -define png:compression-filter=5 -define png:compression-level=9 -define png:compression-strategy=1 -define png:exclude-chunk=all -colorspace sRGB -strip -interlace Plane "${inputfile}" 2>&1)
+    else
+        OUTPUT=$("${convert_bin}" -filter Triangle -define filter:support=2 -unsharp 0.25x0.25+8+0.065 -dither None -posterize 136 -quality 82 -define jpeg:fancy-upsampling=off -define png:compression-filter=5 -define png:compression-level=9 -define png:compression-strategy=1 -define png:exclude-chunk=all -colorspace sRGB -strip -interlace Plane "${inputfile}" "${dir}/${base}_optimized.${ext}" 2>&1)
+    fi
+
+    return $?
+
+}
+
+exec_jpeg_weboptimize () {
+
+    local inputfile="$1"
+
+    local dir=$(dirname -- "${inputfile}")
+    local name="${inputfile##*/}"
+    local base="${name%.*}"
+    local ext="${name##*.}"
+
+    local tmpfile=$(mktemp -p "${dir}" --suffix "${ext}")
+
+    OUTPUT=$("${convert_bin}" -resize "1920x1920>" "${inputfile}" "${tmpfile}" 2>&1)
+    rc=$?
+    if [ $rc -ne 0 ]; then
+        rm "${tmpfile}"
+        return $rc
+    fi
+
+    OUTPUT=$("${mogrify_bin}" -filter Triangle -define filter:support=2 -unsharp 0.25x0.25+8+0.065 -dither None -posterize 136 -quality 82 -define jpeg:fancy-upsampling=off -define png:compression-filter=5 -define png:compression-level=9 -define png:compression-strategy=1 -define png:exclude-chunk=all -colorspace sRGB -strip -interlace Plane "${tmpfile}" 2>&1)
+    rc=$?
+    if [ $rc -ne 0 ]; then
+        rm "${tmpfile}"
+        return $rc
+    fi
+
+    OUTPUT=$("${exiftool_bin}" -all= -overwrite_original -r "${tmpfile}" 2>&1)
+    rc=$?
+    if [ $rc -ne 0 ]; then
+        rm "${tmpfile}"
+        return $rc
+    fi
+
+    if [ "${overwrite}" = true ]; then
+        rm "${inputfile}"
+        mv "${tmpfile}" "${inputfile}"
+    else
+        mv "${tmpfile}" "${dir}/${base}_weboptimized.${ext}"
+    fi
+
+    return 0
+
+}
+
+exec_jpeg_makeprogressive () {
+
+    local inputfile="$1"
+
+    local dir=$(dirname -- "${inputfile}")
+    local name="${inputfile##*/}"
+    local base="${name%.*}"
+    local ext="${name##*.}"
+
+    if [ "${overwrite}" = true ]; then
+        OUTPUT=$("${mogrify_bin}" -strip -interlace Plane "${inputfile}" 2>&1)
+    else
+        OUTPUT=$("${convert_bin}" -strip -interlace Plane "${inputfile}" "${dir}/${base}_progressive.${ext}" 2>&1)
+    fi
+
+    return $?
+
+}
+
+exec_png_optimize () {
+
+    local inputfile="$1"
+
+    local dir=$(dirname -- "${inputfile}")
+    local name="${inputfile##*/}"
+    local base="${name%.*}"
+    local ext="${name##*.}"
+
+    if [ "${overwrite}" = true ]; then
+        OUTPUT=$("${optipng_bin}" "${inputfile}" 2>&1)
+    else
+        OUTPUT=$("${optipng_bin}" -out "${dir}/${base}_optimized.${ext}" "${inputfile}" 2>&1)
+    fi
+
+    return $?
+
+}
+
+exec_strip () {
+
+    local inputfile="$1"
+
+    OUTPUT=$("${exiftool_bin}" -all= -overwrite_original -r "${inputfile}" 2>&1)
+
+    return $?
+
+}
+
+exec_gen_icon () {
+
+    local inputfile="$1"
+
+    local dir=$(dirname -- "${inputfile}")
+    local name="${inputfile##*/}"
+    local base="${name%.*}"
+    local ext="${name##*.}"
+
+    OUTPUT=$("${convert_bin}" -format png -resize 288x288 -gravity center -background white -extent 360x360 "${inputfile}" "${dir}/${base}_icon.png" 2>&1)
+    rc=$?
+    if [ $rc -ne 0 ]; then
+        return $rc
+    fi
+
+    OUTPUT=$("${optipng_bin}" "${dir}/${base}_icon.png" 2>&1)
+
+    return $?
+
+}
+
+exec_gen_icon_rectangle () {
+
+    local inputfile="$1"
+
+    local dir=$(dirname -- "${inputfile}")
+    local name="${inputfile##*/}"
+    local base="${name%.*}"
+    local ext="${name##*.}"
+
+    OUTPUT=$("${convert_bin}" -format png -resize 352x288 -gravity center -background white -extent 440x360 "${inputfile}" "${dir}/${base}_icon.png" 2>&1)
+    rc=$?
+    if [ $rc -ne 0 ]; then
+        return $rc
+    fi
+
+    OUTPUT=$("${optipng_bin}" "${dir}/${base}_icon.png" 2>&1)
+
+    return $?
+
+}
+
+exec_gen_favicon () {
+
+    local inputfile="$1"
+
+    local dir=$(dirname -- "${inputfile}")
+    local name="${inputfile##*/}"
+    local base="${name%.*}"
+    local ext="${name##*.}"
+
+    local wxh=$(convert "${inputfile}" -format "%w x %h" info:)
+    local w=${wxh%% *}
+    local h=${wxh##* }
+    local max=$(( w > h ? w : h ))
+
+    local tmpfile=$(mktemp -p "${dir}" --suffix png)
+
+    OUTPUT=$("${convert_bin}" -background transparent -compose Copy -gravity center -extent ${max}x${max} "${inputfile}" "${tmpfile}" 2>&1)
+    rc=$?
+    if [ $rc -ne 0 ]; then
+        rm "${tmpfile}"
+        return $rc
+    fi
+
+    OUTPUT=$("${convert_bin}" -define icon:auto-resize=64,48,32,16 "${tmpfile}" "${dir}/${base}_favicon.ico" 2>&1)
+    rc=$?
+    if [ $rc -ne 0 ]; then
+        rm "${tmpfile}"
+        return $rc
+    fi
+
+    rm "${tmpfile}"
+
+    return 0
+
+}
+
+overwrite_question () {
+
+    "${kdialog_bin}" --icon configure --title "${!msg_title}" --warningyesno "${msg_common_overwrite_text}"
+    rc=$?
+
+    if [ $rc -eq 0 ]; then
+        overwrite=true
+    else
+        if [ $rc -eq 1 ]; then
+            overwrite=false
+        else
+        {
+            "${kdialog_bin}" --title "${!msg_title}" --passivepopup "${msg_common_abort}" 5
+            exit 2
+        }
+        fi
+    fi
+
+}
+
+iterate_files () {
+
+    if [ "${ask_overwrite}" = true ]; then
+        overwrite_question
+    fi
+
+    file_count=$#
+    dbus_ref=$(kdialog --icon configure --title "${!msg_title}" --progressbar "${msg_common_start}" $file_count)
+    qdbus $dbus_ref showCancelButton true
+    i=0
+
+    for file in "$@"; do
+
+        local basename_file="$(basename "$file")"
+
+        ## Check if cancel button has been pushed
+        if [ "$(qdbus $dbus_ref wasCancelled)" = "true" ]; then
+            qdbus $dbus_ref close && "${kdialog_bin}" --title "${!msg_title}" --passivepopup "${msg_common_abort}" 5
+            exit 2
+        fi
+
+        i=$(($i + 1))
+
+        if [ ! -f "${file}" ]; then
+            "${kdialog_bin}" --title --icon configure "${!msg_title}" --error "$(eval echo "${msg_common_file_not_found}")"
+            break
+        fi
+        qdbus $dbus_ref setLabelText "$(eval echo "${msg_common_progress_text}")"
+
+        local msg_finish_title=msg_${command}_finish_title
+        msg_finish_title="$(eval echo ${!msg_finish_title})"
+        exec_${command} "${file}"
+        rc=$?
+        if [ $rc -eq 0 ]; then
+            "${kdialog_bin}" --title "${msg_finish_title}" --passivepopup "${msg_common_finish_ok}" 5
+        else
+            { qdbus $dbus_ref close; "${kdialog_bin}" --icon configure --title "${msg_finish_title}" --detailederror "${msg_common_finish_error}" "${OUTPUT}"; exit 2; }
+        fi
+
+        qdbus $dbus_ref org.freedesktop.DBus.Properties.Set org.kde.kdialog.ProgressDialog value $i
+
+    done
+
+    qdbus $dbus_ref close
+
+}
+
+## init functions
+
+
+init_convert () {
+
+    value="${1}"
+    shift
+
+    FORMAT="png"
+    if [ "${value}" = "custom" ]; then
+        FORMAT=$("${kdialog_bin}" --icon configure --title "${!msg_title}" --inputbox "${msg_convert_format_input_text}") || \
+            { "${kdialog_bin}" --title "${!msg_title}" --passivepopup "${msg_common_abort}" 5 && exit 2; }
+    else
+        FORMAT="${value}"
+    fi
+
+    iterate_files "${@}"
+
+}
+
+init_resize () {
+
+    value="${1}"
+    shift
+
+    SCALE_FACTOR="50%"
+    if [ "${value}" = "custom" ]; then
+        SCALE_FACTOR=$("${kdialog_bin}" --icon configure --title "${!msg_title}" --inputbox "${msg_resize_scale_input_text}") || \
+            { "${kdialog_bin}" --title "${!msg_title}" --passivepopup "${msg_common_abort}" 5 && exit 2; }
+    else
+        SCALE_FACTOR="${value}"
+    fi
+
+    ask_overwrite=true
+    iterate_files "${@}"
+
+}
+
+init_rotate () {
+
+    value="${1}"
+    shift
+
+    ANGLE="90"
+    if [ "${value}" = "custom" ]; then
+        ANGLE=$("${kdialog_bin}" --icon configure --title "${!msg_title}" --inputbox "${msg_rotate_angle_input_text}") || \
+            { "${kdialog_bin}" --title "${!msg_title}" --passivepopup "${msg_common_abort}" 5 && exit 2; }
+    else
+        ANGLE="${value}"
+    fi
+
+    ask_overwrite=true
+    iterate_files "${@}"
+
+}
+
+init_mirror () {
+
+    value="${1}"
+    shift
+
+    MIRRORDIRECTION="${value}"
+
+    ask_overwrite=true
+    iterate_files "${@}"
+
+}
+
+init_jpeg_recompress () {
+
+    value="${1}"
+    shift
+
+    JPEG_QUALITY="70%"
+    if [ "${value}" = "custom" ]; then
+        JPEG_QUALITY=$("${kdialog_bin}" --icon configure --title "${!msg_title}" --inputbox "${msg_jpeg_recompress_quality_input_text}" "${JPEG_QUALITY}") || \
+            { "${kdialog_bin}" --title "${!msg_title}" --passivepopup "${msg_common_abort}" 5 && exit 2; }
+    else
+        JPEG_QUALITY="${value}"
+    fi
+
+    ask_overwrite=true
+    iterate_files "${@}"
+
+}
+
+init_jpeg_optimize () {
+
+    ask_overwrite=true
+    iterate_files "${@}"
+
+}
+
+init_jpeg_weboptimize () {
+
+    ask_overwrite=true
+    iterate_files "${@}"
+
+}
+
+init_jpeg_makeprogressive () {
+
+    ask_overwrite=true
+    iterate_files "${@}"
+
+}
+
+init_png_optimize () {
+
+    ask_overwrite=true
+    iterate_files "${@}"
+
+}
+
+init_strip () {
+
+    iterate_files "${@}"
+
+}
+
+init_gen_icon () {
+
+    iterate_files "${@}"
+
+}
+
+init_gen_icon_rectangle () {
+
+    iterate_files "${@}"
+
+}
+
+init_gen_favicon () {
+
+    iterate_files "${@}"
+
+}
+
+## Main part
+
+if [ "${1}" = "-h" ] || [ "${1}" = "--help" ] || [ "${1}" = "help" ] || [ ${#} -lt 2 ]; then
+    echo "$msg_help_text"
+    exit 0
+fi
+
+command="${1}"
+shift
+
+msg_title=msg_${command}_title
+
+if [[ ! $(type -t init_${command}) == function ]]; then
+{
+    "${kdialog_bin}" --icon configure --title "${msg_common_dependency_check_failed_title}" --error "$(eval echo "${msg_common_command_not_found_text}")"
+    exit 3
+}
+fi
+
+ask_overwrite=false
+init_${command} "${@}"
+
+exit 0

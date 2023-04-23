@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/bash
 #
 #  Part of kde-servicemenus-imagetools
 #  Copyright (c) since 2021 by Marco Nelles <marco at maniatek dot de>
@@ -18,7 +18,8 @@
 #  along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #
 
-readonly PROGNAME=$(basename $0)
+readonly PROGNAME
+PROGNAME=$(basename "$0")
 
 ## Language
 
@@ -89,7 +90,7 @@ Examples:
 
     msg_common_abort="Operation interrupted by the user."
     msg_common_overwrite_text="In case the images to be saved have the same name as those to be processed.\nDo you want to overwrite them?"
-    msg_common_progress_text="Processing file \$i of \$file_count \(\$basename_file)\)"
+    msg_common_progress_text="Processing file \$i of \$file_count \(\$basename_file\)"
     msg_common_finish_ok="Done."
     msg_common_finish_error="An error has occurred."
     msg_common_file_not_found="File \$basename_file not found."

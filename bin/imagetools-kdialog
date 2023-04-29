@@ -23,7 +23,7 @@ PROGNAME=$(basename "$0")
 
 ## Language
 
-load_language_en_US () {
+load_language_en_US() {
 
     msg_help_text="
 Image tool collection for KDE service menus.
@@ -136,7 +136,7 @@ Examples:
 }
 
 lang=${LANGUAGE%%:*}
-type load_language_${lang} &> /dev/null || lang='en_US'
+type load_language_${lang} &>/dev/null || lang='en_US'
 load_language_${lang}
 
 ## Check dependencies
@@ -173,7 +173,7 @@ fi
 
 ## Exec functions
 
-exec_convert () {
+exec_convert() {
 
     local inputfile="$1"
     local format="$FORMAT"
@@ -191,7 +191,7 @@ exec_convert () {
 
 }
 
-exec_resize () {
+exec_resize() {
 
     local inputfile="$1"
     local scale_factor="$SCALE_FACTOR"
@@ -220,7 +220,7 @@ exec_resize () {
 
 }
 
-exec_rotate () {
+exec_rotate() {
 
     local inputfile="$1"
     local angle="$ANGLE"
@@ -248,7 +248,7 @@ exec_rotate () {
 
 }
 
-exec_mirror () {
+exec_mirror() {
 
     local inputfile="$1"
     local mirrordirection="$MIRRORDIRECTION"
@@ -268,7 +268,7 @@ exec_mirror () {
 
 }
 
-exec_jpeg_recompress () {
+exec_jpeg_recompress() {
 
     local inputfile="$1"
     local quality="$JPEG_QUALITY"
@@ -287,7 +287,7 @@ exec_jpeg_recompress () {
     return $?
 }
 
-exec_jpeg_optimize () {
+exec_jpeg_optimize() {
 
     local inputfile="$1"
 
@@ -307,7 +307,7 @@ exec_jpeg_optimize () {
 
 }
 
-exec_jpeg_weboptimize () {
+exec_jpeg_weboptimize() {
 
     local inputfile="$1"
 
@@ -350,7 +350,7 @@ exec_jpeg_weboptimize () {
 
 }
 
-exec_jpeg_makeprogressive () {
+exec_jpeg_makeprogressive() {
 
     local inputfile="$1"
 
@@ -369,7 +369,7 @@ exec_jpeg_makeprogressive () {
 
 }
 
-exec_png_optimize () {
+exec_png_optimize() {
 
     local inputfile="$1"
 
@@ -388,7 +388,7 @@ exec_png_optimize () {
 
 }
 
-exec_strip () {
+exec_strip() {
 
     local inputfile="$1"
 
@@ -398,7 +398,7 @@ exec_strip () {
 
 }
 
-exec_gen_icon () {
+exec_gen_icon() {
 
     local inputfile="$1"
 
@@ -419,7 +419,7 @@ exec_gen_icon () {
 
 }
 
-exec_gen_icon_rectangle () {
+exec_gen_icon_rectangle() {
 
     local inputfile="$1"
 
@@ -440,7 +440,7 @@ exec_gen_icon_rectangle () {
 
 }
 
-exec_gen_favicon () {
+exec_gen_favicon() {
 
     local inputfile="$1"
 
@@ -452,7 +452,7 @@ exec_gen_favicon () {
     local wxh=$(convert "${inputfile}" -format "%w x %h" info:)
     local w=${wxh%% *}
     local h=${wxh##* }
-    local max=$(( w > h ? w : h ))
+    local max=$((w > h ? w : h))
 
     local tmpfile=$(mktemp -p "${dir}" --suffix png)
 
@@ -476,7 +476,7 @@ exec_gen_favicon () {
 
 }
 
-overwrite_question () {
+overwrite_question() {
 
     "${kdialog_bin}" --icon configure --title "${msg_title}" --warningyesno "${msg_common_overwrite_text}"
     rc=$?
@@ -487,16 +487,16 @@ overwrite_question () {
         if [ $rc -eq 1 ]; then
             overwrite=false
         else
-        {
-            "${kdialog_bin}" --title "${msg_title}" --passivepopup "${msg_common_abort}" 5
-            exit 2
-        }
+            {
+                "${kdialog_bin}" --title "${msg_title}" --passivepopup "${msg_common_abort}" 5
+                exit 2
+            }
         fi
     fi
 
 }
 
-iterate_files () {
+iterate_files() {
 
     if [ "${ask_overwrite}" = true ]; then
         overwrite_question
@@ -525,7 +525,11 @@ iterate_files () {
         if [ $rc -eq 0 ]; then
             "${kdialog_bin}" --title "${msg_finish_title}" --passivepopup "${msg_common_finish_ok}" 5
         else
-            { qdbus $dbus_ref close; "${kdialog_bin}" --icon configure --title "${msg_finish_title}" --detailederror "${msg_common_finish_error}" "${OUTPUT}"; exit 2; }
+            {
+                qdbus $dbus_ref close
+                "${kdialog_bin}" --icon configure --title "${msg_finish_title}" --detailederror "${msg_common_finish_error}" "${OUTPUT}"
+                exit 2
+            }
         fi
 
         qdbus $dbus_ref org.freedesktop.DBus.Properties.Set org.kde.kdialog.ProgressDialog value $i
@@ -540,15 +544,14 @@ iterate_files () {
 
 ## init functions
 
-
-init_convert () {
+init_convert() {
 
     value="${1}"
     shift
 
     FORMAT="png"
     if [ "${value}" = "custom" ]; then
-        FORMAT=$("${kdialog_bin}" --icon configure --title "${msg_title}" --inputbox "${msg_convert_format_input_text}") || \
+        FORMAT=$("${kdialog_bin}" --icon configure --title "${msg_title}" --inputbox "${msg_convert_format_input_text}") ||
             { "${kdialog_bin}" --title "${msg_title}" --passivepopup "${msg_common_abort}" 5 && exit 2; }
     else
         FORMAT="${value}"
@@ -558,14 +561,14 @@ init_convert () {
 
 }
 
-init_resize () {
+init_resize() {
 
     value="${1}"
     shift
 
     SCALE_FACTOR="50%"
     if [ "${value}" = "custom" ]; then
-        SCALE_FACTOR=$("${kdialog_bin}" --icon configure --title "${msg_title}" --inputbox "${msg_resize_scale_input_text}") || \
+        SCALE_FACTOR=$("${kdialog_bin}" --icon configure --title "${msg_title}" --inputbox "${msg_resize_scale_input_text}") ||
             { "${kdialog_bin}" --title "${msg_title}" --passivepopup "${msg_common_abort}" 5 && exit 2; }
     else
         SCALE_FACTOR="${value}"
@@ -576,14 +579,14 @@ init_resize () {
 
 }
 
-init_rotate () {
+init_rotate() {
 
     value="${1}"
     shift
 
     ANGLE="90"
     if [ "${value}" = "custom" ]; then
-        ANGLE=$("${kdialog_bin}" --icon configure --title "${msg_title}" --inputbox "${msg_rotate_angle_input_text}") || \
+        ANGLE=$("${kdialog_bin}" --icon configure --title "${msg_title}" --inputbox "${msg_rotate_angle_input_text}") ||
             { "${kdialog_bin}" --title "${msg_title}" --passivepopup "${msg_common_abort}" 5 && exit 2; }
     else
         ANGLE="${value}"
@@ -594,7 +597,7 @@ init_rotate () {
 
 }
 
-init_mirror () {
+init_mirror() {
 
     value="${1}"
     shift
@@ -606,14 +609,14 @@ init_mirror () {
 
 }
 
-init_jpeg_recompress () {
+init_jpeg_recompress() {
 
     value="${1}"
     shift
 
     JPEG_QUALITY="70%"
     if [ "${value}" = "custom" ]; then
-        JPEG_QUALITY=$("${kdialog_bin}" --icon configure --title "${msg_title}" --inputbox "${msg_jpeg_recompress_quality_input_text}" "${JPEG_QUALITY}") || \
+        JPEG_QUALITY=$("${kdialog_bin}" --icon configure --title "${msg_title}" --inputbox "${msg_jpeg_recompress_quality_input_text}" "${JPEG_QUALITY}") ||
             { "${kdialog_bin}" --title "${msg_title}" --passivepopup "${msg_common_abort}" 5 && exit 2; }
     else
         JPEG_QUALITY="${value}"
@@ -624,53 +627,53 @@ init_jpeg_recompress () {
 
 }
 
-init_jpeg_optimize () {
+init_jpeg_optimize() {
 
     ask_overwrite=true
     iterate_files "${@}"
 
 }
 
-init_jpeg_weboptimize () {
+init_jpeg_weboptimize() {
 
     ask_overwrite=true
     iterate_files "${@}"
 
 }
 
-init_jpeg_makeprogressive () {
+init_jpeg_makeprogressive() {
 
     ask_overwrite=true
     iterate_files "${@}"
 
 }
 
-init_png_optimize () {
+init_png_optimize() {
 
     ask_overwrite=true
     iterate_files "${@}"
 
 }
 
-init_strip () {
+init_strip() {
 
     iterate_files "${@}"
 
 }
 
-init_gen_icon () {
+init_gen_icon() {
 
     iterate_files "${@}"
 
 }
 
-init_gen_icon_rectangle () {
+init_gen_icon_rectangle() {
 
     iterate_files "${@}"
 
 }
 
-init_gen_favicon () {
+init_gen_favicon() {
 
     iterate_files "${@}"
 
@@ -689,10 +692,10 @@ shift
 msg_title=msg_${command}_title
 
 if [[ ! $(type -t init_${command}) == function ]]; then
-{
-    "${kdialog_bin}" --icon configure --title "${msg_common_dependency_check_failed_title}" --error "$(eval echo "${msg_common_command_not_found_text}")"
-    exit 3
-}
+    {
+        "${kdialog_bin}" --icon configure --title "${msg_common_dependency_check_failed_title}" --error "$(eval echo "${msg_common_command_not_found_text}")"
+        exit 3
+    }
 fi
 
 ask_overwrite=false

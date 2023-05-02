@@ -28,6 +28,12 @@ if [ -z "${kdialog_bin}" ]; then
     exit 2
 fi
 
+magick_bin=$(which magick)
+if [ -z "${magick_bin}" ]; then
+    "${kdialog_bin}" --icon configure --title "Dependency check failed" --error "ImageMagick not found. Please install."
+    exit 2
+fi
+
 mogrify_bin=$(which mogrify)
 if [ -z "${mogrify_bin}" ]; then
     "${kdialog_bin}" --icon configure --title "Dependency check failed" --error "ImageMagick not found. Please install."
@@ -89,6 +95,8 @@ Commands:
         remove all unnecessary metadata (strip)
     jpeg_reencode <\$percent|custom>
         Reencode JPEG with new quality value
+    jpeg_reencode_psnr <\$psnr|custom>
+        Reencode with lowest quality value with PSNR >= \$psnr (lossy and slow)
 
     png_optimize
         Optimize PNG encoding (lossless)
@@ -229,6 +237,81 @@ exec_jpeg_reencode() {
     fi
 
     return $?
+}
+
+exec_jpeg_reencode_psnr() {
+
+    local inputfile="$1"
+    local psnr="$PSNR"
+
+    local dir
+    dir=$(dirname -- "${inputfile}")
+    local name="${inputfile##*/}"
+    local base="${name%.*}"
+    local ext="${name##*.}"
+
+    local tmpfile
+    tmpfile=$(mktemp -p "${dir}" --suffix=".${ext}")
+
+    local q
+    local prev_tf
+    for q in 84 82 80 78 76 74 72 70 68 66 64 62 60 58 56 54 52 50 48 46 44 42 40 38 36 34; do
+
+        tf=$(mktemp -p "${dir}" --suffix=".${ext}")
+        OUTPUT=$("${convert_bin}" -filter Triangle -define filter:support=2 -unsharp 0.25x0.25+8+0.065 -dither None -posterize 136 -quality $q -define jpeg:fancy-upsampling=off -colorspace sRGB -strip -interlace Plane "${inputfile}" "${tf}" 2>&1)
+        rc=$?
+        if [ $rc -ne 0 ]; then
+          [ -f "${prev_tf}" ] && rm -f "${prev_tf}"
+          [ -f "${tf}" ] && rm -f "${tf}"
+          [ -f "${tmpfile}" ] && rm -f "${tmpfile}"
+          return $rc
+        fi
+
+        if [ $q -eq 34 ]; then
+            cp "${tf}" "${tmpfile}"
+            break
+        fi
+
+        p=$(${magick_bin} compare -metric PSNR "${inputfile}" "${tf}" null: 2>&1)
+        rc=$?
+        if [ $rc -gt 1 ]; then
+          [ -f "${prev_tf}" ] && rm -f "${prev_tf}"
+          [ -f "${tf}" ] && rm -f "${tf}"
+          [ -f "${tmpfile}" ] && rm -f "${tmpfile}"
+          return $rc
+        fi
+
+        p=${p#*\(}
+        p=${p%*\)}
+
+        if (( $(echo "$p*100 < $psnr" | bc -l) )); then
+            if [ -z "${prev_tf}" ]; then
+                echo "No reencoding without visual loss by PSNR advisable."
+                [ -f "${tf}" ] && rm -f "${tf}"
+                [ -f "${tmpfile}" ] && rm -f "${tmpfile}"
+                return 0
+            fi
+            cp "${prev_tf}" "${tmpfile}"
+            break
+        fi
+
+        [ -n "${prev_tf}" ] && rm -f "${prev_tf}"
+        prev_tf="${tf}"
+
+    done
+
+    [ -f "${prev_tf}" ] && rm -f "${prev_tf}"
+    [ -f "${tf}" ] && rm -f "${tf}"
+
+    if [ "${overwrite}" = true ]; then
+        rm "${inputfile}"
+        mv "${tmpfile}" "${inputfile}"
+    else
+        mv "${tmpfile}" "${dir}/${base}_reencoded_${q}.${ext}"
+    fi
+
+    return 0
+
 }
 
 exec_jpeg_optimize() {
@@ -498,6 +581,9 @@ iterate_files() {
         jpeg_reencode)
             exec_jpeg_reencode "${file}"
             ;;
+        jpeg_reencode_psnr)
+            exec_jpeg_reencode_psnr "${file}"
+            ;;
         png_optimize)
             exec_png_optimize "${file}"
             ;;
@@ -621,6 +707,24 @@ init_jpeg_reencode() {
 
 }
 
+init_jpeg_reencode_psnr() {
+
+    value="${1}"
+    shift
+
+    PSNR="35"
+    if [ "${value}" = "custom" ]; then
+        PSNR=$("${kdialog_bin}" --icon configure --title "${msg_title}" --inputbox "Type the PSNR target value:" "${PSNR}") ||
+            { "${kdialog_bin}" --title "${msg_title}" --passivepopup "Cancel" 5 && exit 2; }
+    else
+        PSNR="${value}"
+    fi
+
+    flag_ask_overwrite=true
+    iterate_files "${@}"
+
+}
+
 init_jpeg_optimize() {
 
     flag_ask_overwrite=true
@@ -721,6 +825,10 @@ jpeg_weboptimize)
 jpeg_reencode)
     msg_title="Reencoding of $basename_file"
     init_jpeg_reencode "${@}"
+    ;;
+jpeg_reencode_psnr)
+    msg_title="Reencoding of $basename_file"
+    init_jpeg_reencode_psnr "${@}"
     ;;
 png_optimize)
     msg_title="Optimizing of $basename_file"

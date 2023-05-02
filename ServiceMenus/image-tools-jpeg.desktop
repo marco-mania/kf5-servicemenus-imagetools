@@ -18,7 +18,7 @@
 #
 
 [Desktop Entry]
-Actions=jpeg_progressive;jpeg_optimize;jpeg_weboptimize;_SEPARATOR_;jpeg_reencode_50;jpeg_reencode_70;jpeg_reencode_80;jpeg_reencode_90;jpeg_custom_reencode;
+Actions=jpeg_progressive;jpeg_optimize;jpeg_weboptimize;_SEPARATOR_;jpeg_reencode_50;jpeg_reencode_70;jpeg_reencode_80;jpeg_reencode_90;jpeg_custom_reencode;jpeg_reencode_psnr;jpeg_custom_reencode_psnr;
 MimeType=image/jpeg
 Name=JPEG tools service menu
 ServiceTypes=KonqPopupMenu/Plugin,image/jpeg
@@ -88,3 +88,17 @@ Terminal=false
 Type=Application
 Name=Custom quality
 Name[de]=Benutzerdefinierte Qualität
+
+[Desktop Action jpeg_reencode_psnr]
+Exec=imagetools-kdialog jpeg_reencode_psnr 35 %F
+Terminal=false
+Type=Application
+Name=Reencode by lowest PSNR 35 dB (slow)
+Name[de]=Rekodierung anhand kleinstem PSNR 35 dB (langsam)
+
+[Desktop Action jpeg_custom_reencode_psnr]
+Exec=imagetools-kdialog jpeg_reencode_psnr custom %F
+Terminal=false
+Type=Application
+Name=Custom PSNR (slow)
+Name[de]=Benutzerdefinierte PSNR (langsam)

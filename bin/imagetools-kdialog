@@ -82,10 +82,10 @@ Commands:
     jpeg_makeprogressive
         Encode JPEG progressive
     jpeg_optimize
-        Optimize JPEG encoding with quality value 80% (lossy)
-    jpeg_weboptimize
-        Resize JPEG to 1920px on the longer side (max. FullHD),
-        optimize JPEG encoding with quality value 80% (lossy) and
+        Optimized JPEG reencoding with quality value 82% (lossy)
+    jpeg_optimize_topublish <\$y>
+        Reduce JPEG to \y px on the longer side,
+        reencode JPEG progressive with quality value 76% (lossy) and
         remove all unnecessary metadata (strip)
     jpeg_reencode <\$percent|custom>
         Reencode JPEG with new quality value
@@ -243,18 +243,19 @@ exec_jpeg_optimize() {
 
     ## https://www.smashingmagazine.com/2015/06/efficient-image-resizing-with-imagemagick/
     if [ "${overwrite}" = true ]; then
-        OUTPUT=$("${mogrify_bin}" -filter Triangle -define filter:support=2 -unsharp 0.25x0.25+8+0.065 -dither None -posterize 136 -quality 80 -define jpeg:fancy-upsampling=off -colorspace sRGB -strip -interlace Plane "${inputfile}" 2>&1)
+        OUTPUT=$("${mogrify_bin}" -filter Triangle -define filter:support=2 -unsharp 0.25x0.25+8+0.065 -dither None -posterize 136 -quality 82 -define jpeg:fancy-upsampling=off -colorspace sRGB -strip "${inputfile}" 2>&1)
     else
-        OUTPUT=$("${convert_bin}" -filter Triangle -define filter:support=2 -unsharp 0.25x0.25+8+0.065 -dither None -posterize 136 -quality 80 -define jpeg:fancy-upsampling=off -colorspace sRGB -strip -interlace Plane "${inputfile}" "${dir}/${base}_optimized.${ext}" 2>&1)
+        OUTPUT=$("${convert_bin}" -filter Triangle -define filter:support=2 -unsharp 0.25x0.25+8+0.065 -dither None -posterize 136 -quality 82 -define jpeg:fancy-upsampling=off -colorspace sRGB -strip "${inputfile}" "${dir}/${base}_optimized.${ext}" 2>&1)
     fi
 
     return $?
 
 }
 
-exec_jpeg_weboptimize() {
+exec_jpeg_optimize_topublish() {
 
     local inputfile="$1"
+    local width="$WIDTH"
 
     local dir
     dir=$(dirname -- "${inputfile}")
@@ -263,16 +264,16 @@ exec_jpeg_weboptimize() {
     local ext="${name##*.}"
 
     local tmpfile
-    tmpfile=$(mktemp -p "${dir}" --suffix "${ext}")
+    tmpfile=$(mktemp -p "${dir}" --suffix=".${ext}")
 
-    OUTPUT=$("${convert_bin}" -resize "1920x1920>" "${inputfile}" "${tmpfile}" 2>&1)
+    OUTPUT=$("${convert_bin}" -resize "${width}x${width}>" "${inputfile}" "${tmpfile}" 2>&1)
     rc=$?
     if [ $rc -ne 0 ]; then
         rm "${tmpfile}"
         return $rc
     fi
 
-    OUTPUT=$("${mogrify_bin}" -filter Triangle -define filter:support=2 -unsharp 0.25x0.25+8+0.065 -dither None -posterize 136 -quality 80 -define jpeg:fancy-upsampling=off -colorspace sRGB -strip -interlace Plane "${tmpfile}" 2>&1)
+    OUTPUT=$("${mogrify_bin}" -filter Triangle -define filter:support=2 -unsharp 0.25x0.25+8+0.065 -dither None -posterize 136 -quality 76 -define jpeg:fancy-upsampling=off -colorspace sRGB -strip -interlace Plane "${tmpfile}" 2>&1)
     rc=$?
     if [ $rc -ne 0 ]; then
         rm "${tmpfile}"
@@ -290,7 +291,7 @@ exec_jpeg_weboptimize() {
         rm "${inputfile}"
         mv "${tmpfile}" "${inputfile}"
     else
-        mv "${tmpfile}" "${dir}/${base}_weboptimized.${ext}"
+        mv "${tmpfile}" "${dir}/${base}_topublish.${ext}"
     fi
 
     return 0
@@ -408,7 +409,7 @@ exec_gen_favicon() {
     local max=$((w > h ? w : h))
 
     local tmpfile
-    tmpfile=$(mktemp -p "${dir}" --suffix png)
+    tmpfile=$(mktemp -p "${dir}" --suffix=".png")
 
     OUTPUT=$("${convert_bin}" -background transparent -compose Copy -gravity center -extent ${max}x${max} "${inputfile}" "${tmpfile}" 2>&1)
     rc=$?
@@ -432,13 +433,13 @@ exec_gen_favicon() {
 
 overwrite_question() {
 
-    "${kdialog_bin}" --icon configure --title "${msg_title}" --warningyesno "In case the images to be saved have the same name as those to be processed.\nDo you want to overwrite them?"
+    "${kdialog_bin}" --icon configure --title "${msg_title}" --warningyesno "Do you want to overwrite the original file(s)? Otherwise a new file with a filename suffix will be created." --yes-label "No, create new files" --no-label "YES, OVERWRITE"
     rc=$?
 
-    if [ $rc -eq 0 ]; then
+    if [ $rc -eq 1 ]; then
         overwrite=true
     else
-        if [ $rc -eq 1 ]; then
+        if [ $rc -eq 0 ]; then
             overwrite=false
         else
             {
@@ -492,8 +493,8 @@ iterate_files() {
         jpeg_optimize)
             exec_jpeg_optimize "${file}"
             ;;
-        jpeg_weboptimize)
-            exec_jpeg_weboptimize "${file}"
+        jpeg_optimize_topublish)
+            exec_jpeg_optimize_topublish "${file}"
             ;;
         jpeg_reencode)
             exec_jpeg_reencode "${file}"
@@ -628,7 +629,18 @@ init_jpeg_optimize() {
 
 }
 
-init_jpeg_weboptimize() {
+init_jpeg_optimize_topublish() {
+
+    value="${1}"
+    shift
+
+    WIDTH="1920"
+    if [ "${value}" = "custom" ]; then
+        WIDTH=$("${kdialog_bin}" --icon configure --title "${msg_title}" --inputbox "Type the width in px for the longer side:" "${WIDTH}") ||
+            { "${kdialog_bin}" --title "${msg_title}" --passivepopup "Cancel" 5 && exit 2; }
+    else
+        WIDTH="${value}"
+    fi
 
     flag_ask_overwrite=true
     iterate_files "${@}"
@@ -711,12 +723,12 @@ jpeg_makeprogressive)
     init_jpeg_makeprogressive "${@}"
     ;;
 jpeg_optimize)
-    msg_title="Optimizing of $basename_file"
+    msg_title="Optimized reencoding of $basename_file"
     init_jpeg_optimize "${@}"
     ;;
-jpeg_weboptimize)
-    msg_title="Optimizing of $basename_file for web publishing"
-    init_jpeg_weboptimize "${@}"
+jpeg_optimize_topublish)
+    msg_title="Optimizing of $basename_file for publishing"
+    init_jpeg_optimize_topublish "${@}"
     ;;
 jpeg_reencode)
     msg_title="Reencoding of $basename_file"

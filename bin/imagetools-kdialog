@@ -84,7 +84,7 @@ Commands:
     jpeg_optimize
         Optimized JPEG reencoding with quality value 82% (lossy)
     jpeg_optimize_topublish <\$y>
-        Reduce JPEG to \y px on the longer side,
+        Reduce JPEG to \$y px on the longer side,
         reencode JPEG progressive with quality value 76% (lossy) and
         remove all unnecessary metadata (strip)
     jpeg_reencode <\$percent|custom>

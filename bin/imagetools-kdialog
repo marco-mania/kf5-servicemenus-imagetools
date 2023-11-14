@@ -103,6 +103,9 @@ Commands:
     gen_favicon
         generate favicon
 
+    gen_optimized_text_img
+        generate optimized text image
+
 Examples:
     ${progname} jpeg_optimize /path/to/image1.jpg /path/to/image2.jpg
     ${progname} jpeg_reencode 50% /path/to/image1.jpg
@@ -431,6 +434,29 @@ exec_gen_favicon() {
 
 }
 
+# https://gist.github.com/lelandbatey/8677901
+exec_gen_optimized_text_img() {
+
+    local inputfile="$1"
+
+    local dir
+    dir=$(dirname -- "${inputfile}")
+    local name="${inputfile##*/}"
+    local base="${name%.*}"
+    local ext="${name##*.}"
+
+    OUTPUT=$("${convert_bin}" -format png -morphology Convolve DoG:15,100,0 -negate -normalize -blur 0x1 -channel RBG -depth 2 -level 60%,91%,0.1 "${inputfile}" "${dir}/${base}_optimized_txt.png" 2>&1)
+    rc=$?
+    if [ $rc -ne 0 ]; then
+        return $rc
+    fi
+
+    OUTPUT=$("${optipng_bin}" "${dir}/${base}_optimized_txt.png" 2>&1)
+
+    return $?
+
+}
+
 overwrite_question() {
 
     "${kdialog_bin}" --icon configure --title "${msg_title}" --warningyesno "Do you want to overwrite the original file(s)? Otherwise a new file with a filename suffix will be created." --yes-label "No, create new files" --no-label "YES, OVERWRITE"
@@ -513,6 +539,9 @@ iterate_files() {
             ;;
         gen_favicon)
             exec_gen_favicon "${file}"
+            ;;
+        gen_optimized_text_img)
+            exec_gen_optimized_text_img "${file}"
             ;;
         esac
 
@@ -685,6 +714,12 @@ init_gen_favicon() {
 
 }
 
+init_gen_optimized_text_img() {
+
+    iterate_files "${@}"
+
+}
+
 ## Main part
 
 command="${1}"
@@ -753,6 +788,10 @@ gen_icon_rectangle)
 gen_favicon)
     msg_title="Generating favicon from $basename_file"
     init_gen_favicon "${@}"
+    ;;
+gen_optimized_text_img)
+    msg_title="Generate optimized text image from $basename_file"
+    init_gen_optimized_text_img "${@}"
     ;;
 *)
     ${kdialog_bin} --icon configure --title "Commandline error" --error "Command ${command} not found. Please install corresponding package."

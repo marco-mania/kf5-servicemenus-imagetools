@@ -20,42 +20,9 @@
 
 readonly progname="$(basename "$0")"
 
-## Check dependencies
+function help() {
 
-kdialog_bin=$(which kdialog)
-if [ -z "${kdialog_bin}" ]; then
-    echo "kdialog not found. Assuming KDE environment."
-    exit 2
-fi
-
-mogrify_bin=$(which mogrify)
-if [ -z "${mogrify_bin}" ]; then
-    "${kdialog_bin}" --icon configure --title "Dependency check failed" --error "ImageMagick not found. Please install."
-    exit 2
-fi
-
-convert_bin=$(which convert)
-if [ -z "${convert_bin}" ]; then
-    "${kdialog_bin}" --icon configure --title "Dependency check failed" --error "ImageMagick not found. Please install."
-    exit 2
-fi
-
-exiftool_bin=$(which exiftool)
-if [ -z "${exiftool_bin}" ]; then
-    "${kdialog_bin}" --icon configure --title "Dependency check failed" --error "ExifTool not found. Please install."
-    exit 2
-fi
-
-optipng_bin=$(which optipng)
-if [ -z "${optipng_bin}" ]; then
-    "${optipng_bin}" --icon configure --title "Dependency check failed" --error "OptiPNG not found. Please install."
-    exit 2
-fi
-
-## Define help text
-
-msg_help_text="
-Image tool collection for KDE service menus.
+    echo "Image tool collection for KDE service menus.
 
 Usage: ${progname} \$command --
 
@@ -113,7 +80,106 @@ Examples:
     ${progname} resize custom /path/to/image1.jpg
 "
 
-## Exec functions
+}
+
+## language
+
+function load_lang() {
+
+    case $1 in
+        en_US | *)
+
+            msg_common_dependency_check_failed_title="Dependency check failed"
+            msg_common_kdialog_not_found_text="kdialog not found. Assuming KDE environment."
+            msg_common_imagemagick_not_found_text="ImageMagick not found."
+            msg_common_exiftool_not_found_text="ExifTool not found."
+            msg_common_optipng_not_found_text="OptiPNG not found."
+
+            msg_common_abort="Operation interrupted by user."
+            msg_common_overwrite_text="Do you want to overwrite the original file(s)? Otherwise a new file with a filename suffix will be created."
+            msg_common_overwrite_yes="YES, OVERWRITE"
+            msg_common_overwrite_no="No, create new files"
+            msg_common_progress_text="Processing file \$i of \$file_count \(\$basename_file\)"
+            msg_common_start="Starting."
+            msg_common_finish_ok="Done."
+            msg_common_finish_error="An error has occurred."
+            msg_common_file_not_found="File \$basename_file not found."
+            msg_common_command_not_found_text="The requested command \$command is not implemented."
+            msg_common_cancel="Cancel"
+
+            msg_convert_title="Conversion of images"
+            msg_convert_format_text="Type the format you want.\nA complete list can be obtained from the shell with: mogrify -list format\nor by consulting the ImageMagick manual."
+
+            msg_resize_title="Resizing of images"
+            msg_resize_scale_text="Type the scale factor in percentage or the maximum size in pixel you want for the longer edge.\nValid values can be: 50% or 1920p:"
+
+            msg_rotate_title="Rotation of images"
+            msg_rotate_angle_text="Enter the desired rotation angle in degree:"
+
+            msg_mirror_title="Mirroring of images"
+
+            msg_jpeg_makeprogressive_title="Make jpeg files progressive"
+
+            msg_jpeg_optimize_title="Optimized reencoding of jpeg files"
+
+            msg_jpeg_optimizetopublish_title="Optimizing of jpegs for publishing"
+            msg_jpeg_optimizetopublish_title_scale_text="Type the width in px for the longer side:"
+
+            msg_jpeg_reencode_title="Reencoding of jpegs"
+            msg_jpeg_reencode_quality_text="Type the quality in percent:"
+
+            msg_png_optimize_title="Optimizing of pngs"
+
+            msg_strip_title="Striping of metadata from images"
+
+            msg_gen_icon_title="Generating icon from images"
+
+            msg_gen_icon_rectangle_title="Generating icon from images"
+
+            msg_gen_favicon_title="Generating favicon from images"
+
+            msg_gen_optimized_text_img_title="Generate optimized text image from image"
+
+            ;;
+    esac
+
+}
+
+load_lang ${LANGUAGE%%:*}
+
+## Check dependencies
+
+kdialog_bin=$(which kdialog)
+if [ -z "${kdialog_bin}" ]; then
+    echo "${msg_common_kdialog_not_found_text}"
+    exit 2
+fi
+
+mogrify_bin=$(which mogrify)
+if [ -z "${mogrify_bin}" ]; then
+    "${kdialog_bin}" --icon configure --title "${msg_common_dependency_check_failed_title}" --error "${msg_common_imagemagick_not_found_text}"
+    exit 2
+fi
+
+convert_bin=$(which convert)
+if [ -z "${convert_bin}" ]; then
+    "${kdialog_bin}" --icon configure --title "${msg_common_dependency_check_failed_title}" --error "${msg_common_imagemagick_not_found_text}"
+    exit 2
+fi
+
+exiftool_bin=$(which exiftool)
+if [ -z "${exiftool_bin}" ]; then
+    "${kdialog_bin}" --icon configure --title "${msg_common_dependency_check_failed_title}" --error "${msg_common_exiftool_not_found_text}"
+    exit 2
+fi
+
+optipng_bin=$(which optipng)
+if [ -z "${optipng_bin}" ]; then
+    "${kdialog_bin}" --icon configure --title "${msg_common_dependency_check_failed_title}" --error "${msg_common_optipng_not_found_text}"
+    exit 2
+fi
+
+## exec functions
 
 exec_convert() {
 
@@ -459,7 +525,7 @@ exec_gen_optimized_text_img() {
 
 overwrite_question() {
 
-    "${kdialog_bin}" --icon configure --title "${msg_title}" --warningyesno "Do you want to overwrite the original file(s)? Otherwise a new file with a filename suffix will be created." --yes-label "No, create new files" --no-label "YES, OVERWRITE"
+    "${kdialog_bin}" --icon configure --title "${msg_title}" --warningyesno "${msg_common_overwrite_text}" --yes-label "${msg_common_overwrite_no}" --no-label "${msg_common_overwrite_yes}"
     rc=$?
 
     if [ $rc -eq 1 ]; then
@@ -469,7 +535,7 @@ overwrite_question() {
             overwrite=false
         else
             {
-                "${kdialog_bin}" --title "${msg_title}" --passivepopup "Operation interrupted by the user." 5
+                "${kdialog_bin}" --title "${msg_title}" --passivepopup "${msg_common_abort}" 5
                 exit 2
             }
         fi
@@ -484,7 +550,7 @@ iterate_files() {
     fi
 
     file_count=$#
-    dbus_ref=$(${kdialog_bin} --icon configure --title "${msg_title}" --progressbar "Starting." $file_count)
+    dbus_ref=$(${kdialog_bin} --icon configure --title "${msg_title}" --progressbar "${msg_common_start}" $file_count)
     qdbus $dbus_ref org.kde.kdialog.ProgressDialog.showCancelButton true
     i=1
 
@@ -495,10 +561,10 @@ iterate_files() {
         basename_file="$(basename "$file")"
 
         if [ ! -f "${file}" ]; then
-            "${kdialog_bin}" --title --icon configure "${msg_title}" --error "File $basename_file not found."
+            "${kdialog_bin}" --title --icon configure "${msg_title}" --error "$(eval echo "${msg_common_file_not_found}")"
             break
         fi
-        qdbus $dbus_ref org.kde.kdialog.ProgressDialog.setLabelText "Processing file $i of $file_count ($basename_file)"
+        qdbus $dbus_ref org.kde.kdialog.ProgressDialog.setLabelText "$(eval echo "${msg_common_progress_text}")"
 
         case $command in
         convert)
@@ -547,11 +613,11 @@ iterate_files() {
 
         rc=$?
         if [ $rc -eq 0 ]; then
-            "${kdialog_bin}" --title "${msg_title}" --passivepopup "Done." 5
+            "${kdialog_bin}" --title "${msg_title}" --passivepopup "${msg_common_finish_ok}" 5
         else
             {
                 qdbus $dbus_ref close
-                "${kdialog_bin}" --icon configure --title "${msg_title}" --detailederror "An error has occurred." "${OUTPUT}"
+                "${kdialog_bin}" --icon configure --title "${msg_title}" --detailederror "${msg_common_finish_error}" "${OUTPUT}"
                 exit 2
             }
         fi
@@ -575,8 +641,8 @@ init_convert() {
 
     FORMAT="png"
     if [ "${value}" = "custom" ]; then
-        FORMAT=$("${kdialog_bin}" --icon configure --title "${msg_title}" --inputbox "Type the format you want.\nA complete list can be obtained from the shell with: mogrify -list format\nor by consulting the ImageMagick manual.") ||
-            { "${kdialog_bin}" --title "${msg_title}" --passivepopup "Cancel" 5 && exit 2; }
+        FORMAT=$("${kdialog_bin}" --icon configure --title "${msg_title}" --inputbox "${msg_convert_format_text}") ||
+            { "${kdialog_bin}" --title "${msg_title}" --passivepopup "${msg_common_cancel}" 5 && exit 2; }
     else
         FORMAT="${value}"
     fi
@@ -592,8 +658,8 @@ init_resize() {
 
     SCALE_FACTOR="50%"
     if [ "${value}" = "custom" ]; then
-        SCALE_FACTOR=$("${kdialog_bin}" --icon configure --title "${msg_title}" --inputbox "Type the scale factor in percentage or the maximum size in pixel you want for the longer edge.\nValid values can be: 50% or 1920p:") ||
-            { "${kdialog_bin}" --title "${msg_title}" --passivepopup "Cancel" 5 && exit 2; }
+        SCALE_FACTOR=$("${kdialog_bin}" --icon configure --title "${msg_title}" --inputbox "${msg_resize_scale_text}") ||
+            { "${kdialog_bin}" --title "${msg_title}" --passivepopup "${msg_common_cancel}" 5 && exit 2; }
     else
         SCALE_FACTOR="${value}"
     fi
@@ -610,8 +676,8 @@ init_rotate() {
 
     ANGLE="90"
     if [ "${value}" = "custom" ]; then
-        ANGLE=$("${kdialog_bin}" --icon configure --title "${msg_title}" --inputbox "Enter the desired rotation angle in degree:") ||
-            { "${kdialog_bin}" --title "${msg_title}" --passivepopup "Cancel" 5 && exit 2; }
+        ANGLE=$("${kdialog_bin}" --icon configure --title "${msg_title}" --inputbox "${msg_rotate_angle_text}") ||
+            { "${kdialog_bin}" --title "${msg_title}" --passivepopup "${msg_common_cancel}" 5 && exit 2; }
     else
         ANGLE="${value}"
     fi
@@ -640,8 +706,8 @@ init_jpeg_reencode() {
 
     JPEG_QUALITY="70%"
     if [ "${value}" = "custom" ]; then
-        JPEG_QUALITY=$("${kdialog_bin}" --icon configure --title "${msg_title}" --inputbox "Type the quality in percent:" "${JPEG_QUALITY}") ||
-            { "${kdialog_bin}" --title "${msg_title}" --passivepopup "Cancel" 5 && exit 2; }
+        JPEG_QUALITY=$("${kdialog_bin}" --icon configure --title "${msg_title}" --inputbox "${msg_jpeg_reencode_quality_text}" "${JPEG_QUALITY}") ||
+            { "${kdialog_bin}" --title "${msg_title}" --passivepopup "${msg_common_cancel}" 5 && exit 2; }
     else
         JPEG_QUALITY="${value}"
     fi
@@ -665,8 +731,8 @@ init_jpeg_optimize_topublish() {
 
     WIDTH="1920"
     if [ "${value}" = "custom" ]; then
-        WIDTH=$("${kdialog_bin}" --icon configure --title "${msg_title}" --inputbox "Type the width in px for the longer side:" "${WIDTH}") ||
-            { "${kdialog_bin}" --title "${msg_title}" --passivepopup "Cancel" 5 && exit 2; }
+        WIDTH=$("${kdialog_bin}" --icon configure --title "${msg_title}" --inputbox "${msg_jpeg_optimizetopublish_title_scale_text}" "${WIDTH}") ||
+            { "${kdialog_bin}" --title "${msg_title}" --passivepopup "${msg_common_cancel}" 5 && exit 2; }
     else
         WIDTH="${value}"
     fi
@@ -720,7 +786,7 @@ init_gen_optimized_text_img() {
 
 }
 
-## Main part
+## main part
 
 command="${1}"
 shift
@@ -728,73 +794,73 @@ shift
 flag_ask_overwrite=false
 
 if [ -z "$command" ]; then
-    echo "$msg_help_text"
+    help
     exit 0
 fi
 
 case $command in
 help | -h | --help)
-    echo "$msg_help_text"
+    help
     exit 0
     ;;
 convert)
-    msg_title="Convertion of $basename_file"
+    msg_title="${msg_convert_title}"
     init_convert "${@}"
     ;;
 resize)
-    msg_title="Resizing of $basename_file"
+    msg_title="${msg_resize_title}"
     init_resize "${@}"
     ;;
 rotate)
-    msg_title="Rotation of $basename_file"
+    msg_title="${msg_rotate_title}"
     init_rotate "${@}"
     ;;
 mirror)
-    msg_title="Mirroring of $basename_file"
+    msg_title="${msg_mirror_title}"
     init_mirror "${@}"
     ;;
 jpeg_makeprogressive)
-    msg_title="Make $basename_file progressive"
+    msg_title="${msg_jpeg_makeprogressive_title}"
     init_jpeg_makeprogressive "${@}"
     ;;
 jpeg_optimize)
-    msg_title="Optimized reencoding of $basename_file"
+    msg_title="${msg_jpeg_optimize_title}"
     init_jpeg_optimize "${@}"
     ;;
 jpeg_optimize_topublish)
-    msg_title="Optimizing of $basename_file for publishing"
+    msg_title="${msg_jpeg_optimizetopublish_title}"
     init_jpeg_optimize_topublish "${@}"
     ;;
 jpeg_reencode)
-    msg_title="Reencoding of $basename_file"
+    msg_title="${msg_jpeg_reencode_title}"
     init_jpeg_reencode "${@}"
     ;;
 png_optimize)
-    msg_title="Optimizing of $basename_file"
+    msg_title="${msg_png_optimize_title}"
     init_png_optimize "${@}"
     ;;
 strip)
-    msg_title="Striping of metadata from $basename_file"
+    msg_title="${msg_strip_title}"
     init_strip "${@}"
     ;;
 gen_icon)
-    msg_title="Generating icon from $basename_file"
+    msg_title="${msg_gen_icon_title}"
     init_gen_icon "${@}"
     ;;
 gen_icon_rectangle)
-    msg_title="Generating icon from $basename_file"
+    msg_title="${msg_gen_icon_rectangle_title}"
     init_gen_icon_rectangle "${@}"
     ;;
 gen_favicon)
-    msg_title="Generating favicon from $basename_file"
+    msg_title="${msg_gen_favicon_title}"
     init_gen_favicon "${@}"
     ;;
 gen_optimized_text_img)
-    msg_title="Generate optimized text image from $basename_file"
+    msg_title="${msg_gen_optimized_text_img_title}"
     init_gen_optimized_text_img "${@}"
     ;;
 *)
-    ${kdialog_bin} --icon configure --title "Commandline error" --error "Command ${command} not found. Please install corresponding package."
+    "${kdialog_bin}" --icon configure --title "${msg_common_dependency_check_failed_title}" --error "$(eval echo "${msg_common_command_not_found_text}")"
     exit 2
     ;;
 esac

@@ -34,6 +34,10 @@ In that case the directory `~/.local/bin` has to be be placed in the search path
 environment variable `$PATH`.
 E.g. for a Fish shell you can simply call `fish_add_path ~/.local/bin`.
 
+Finally you need to restart your plasma session or call:
+
+    kbuildsycoca5
+
 ## Uninstall
 
 System wide installation:

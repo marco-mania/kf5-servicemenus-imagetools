@@ -18,13 +18,13 @@
 #  along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #
 
-readonly progname="$(basename "$0")"
+readonly PROGNAME="$(basename "$0")"
 
 function help() {
 
     echo "Image tool collection for KDE service menus.
 
-Usage: ${progname} \$command --
+Usage: ${PROGNAME} \$command --
 
 Commands:
     help, -h, --help
@@ -74,10 +74,10 @@ Commands:
         generate optimized text image
 
 Examples:
-    ${progname} jpeg_optimize /path/to/image1.jpg /path/to/image2.jpg
-    ${progname} jpeg_reencode 50% /path/to/image1.jpg
-    ${progname} resize 1920p /path/to/image1.jpg
-    ${progname} resize custom /path/to/image1.jpg
+    ${PROGNAME} jpeg_optimize /path/to/image1.jpg /path/to/image2.jpg
+    ${PROGNAME} jpeg_reencode 50% /path/to/image1.jpg
+    ${PROGNAME} resize 1920p /path/to/image1.jpg
+    ${PROGNAME} resize custom /path/to/image1.jpg
 "
 
 }

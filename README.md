@@ -18,7 +18,7 @@ Copyright (C) 2018-2019 Giuseppe Benigno <giuseppe.benigno@gmail.com>, GPL-3.0+
 
 Install the requirements (Arch Linux):
 
-    sudo pacman -S imagemagick perl-image-exiftool optipng
+    sudo pacman -S imagemagick perl-image-exiftool optipng qt5-tools
 
 To install system wide:
 
